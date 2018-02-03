@@ -2083,8 +2083,8 @@ Transform:
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1164186167841798}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0.000000059604638, y: 2.0097181e-14, z: -1.6940657e-21, w: 1}
+  m_LocalPosition: {x: 0, y: 1.8499618, z: -0.019952774}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 4809183258873532}
@@ -2264,7 +2264,7 @@ Transform:
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1535222192133446}
   m_LocalRotation: {x: -0.000000059604638, y: 5.0242952e-14, z: 3.0145767e-14, w: 1}
-  m_LocalPosition: {x: 0, y: 1.9920292, z: -0.019683838}
+  m_LocalPosition: {x: -0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 4566543068788828}
@@ -2959,7 +2959,7 @@ MonoBehaviour:
   head: {fileID: 4774731577663662}
   yRotationSpeed: 45
   xRotationSpeed: 45
-  baseHud: {fileID: 223167762118662840, guid: 26e089ca4921c2644b19e0ef142b59b4, type: 2}
+  baseHud: {fileID: 114937932495469942, guid: 26e089ca4921c2644b19e0ef142b59b4, type: 2}
   health: 100
   weaponLayermask:
     serializedVersion: 2

@@ -38,7 +38,7 @@ public class ControlPC : NetworkBehaviour
 
     // UI
     [Header("UI")]
-    public Canvas baseHud;
+    public BaseHUD baseHud;
 
     // Transform and State syncvars
     //[SyncVar]
@@ -117,6 +117,8 @@ public class ControlPC : NetworkBehaviour
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
             }
+
+            
         }
     }
 
@@ -278,8 +280,7 @@ public class ControlPC : NetworkBehaviour
         {
             fireTimer = 0;
             firedPrimary = true;
-
-            //int layermask = 1 << 9; // check normal hitbox
+            
             Ray ray = cam.ScreenPointToRay(new Vector3(cam.pixelWidth / 2, cam.pixelHeight / 2, 0));
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, 200, weaponLayermask))
@@ -290,10 +291,11 @@ public class ControlPC : NetworkBehaviour
                 }
                 else    // if it's another PC
                 {
+                    print("hit player");
 
                     Instantiate(onHitParticle, hit.point, Quaternion.LookRotation(hit.normal));
 
-                    CmdShootPC(hit.collider.gameObject, weaponDamage, hit.collider.gameObject.layer);
+                    ShootPC(hit.collider.gameObject, weaponDamage, hit.collider.gameObject.layer);
                    
                 }
             }
@@ -301,8 +303,8 @@ public class ControlPC : NetworkBehaviour
 
     }
 
-    [Command]
-    public void CmdShootPC(GameObject hitPoint, int dmg, int layer)
+    //[Command]
+    public void ShootPC(GameObject hitPoint, int dmg, int layer)
     {
         if (hitPoint)
         {
@@ -346,6 +348,7 @@ public class ControlPC : NetworkBehaviour
             CmdRespawn();
             CmdCallSync(transform.position, transform.rotation, rb.velocity);
         }
+        baseHud.health.text = health.ToString();
     }
 
     [Command]
