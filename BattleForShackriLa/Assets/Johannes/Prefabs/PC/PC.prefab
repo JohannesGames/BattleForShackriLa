@@ -2952,13 +2952,14 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 0
   baseSpeed: 4
+  airBaseSpeed: 3
   isGrounded: 0
-  jumpHeight: 2
-  airMultiplier: 0.2
+  jumpTimeLength: 0.5
+  jumpHeight: 5
   maxVelocityChange: 5
   stoppingForce: 1
   timeToMaxGravity: 2
-  gravity: 8
+  gravity: 15
   cameraContianer: {fileID: 4566543068788828}
   head: {fileID: 4774731577663662}
   yRotationSpeed: 45
