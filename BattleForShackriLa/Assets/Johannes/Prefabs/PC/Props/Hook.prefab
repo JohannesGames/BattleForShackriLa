@@ -22,6 +22,7 @@ GameObject:
   - component: {fileID: 33995302671935340}
   - component: {fileID: 65501025186205076}
   - component: {fileID: 23310580185260812}
+  - component: {fileID: 114094264834325688}
   - component: {fileID: 54910430619552472}
   m_Layer: 0
   m_Name: Hook
@@ -106,8 +107,21 @@ BoxCollider:
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1617147787907944}
   m_Material: {fileID: 0}
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_Enabled: 1
   serializedVersion: 2
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &114094264834325688
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1617147787907944}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e82ed386164c144c86bad913f4eca69, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rb: {fileID: 54910430619552472}
+  sender: {fileID: 0}
