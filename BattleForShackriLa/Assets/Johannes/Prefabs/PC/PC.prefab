@@ -1204,6 +1204,22 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!1 &1927757010197132
+GameObject:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  serializedVersion: 5
+  m_Component:
+  - component: {fileID: 4333883256580776}
+  - component: {fileID: 114104124380633706}
+  m_Layer: 0
+  m_Name: Grappling Hook - Movement Ability
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
 --- !u!1 &1933514064995468
 GameObject:
   m_ObjectHideFlags: 1
@@ -1767,6 +1783,7 @@ Transform:
   - {fileID: 4991715616605904}
   - {fileID: 4985261946899396}
   - {fileID: 4566543068788828}
+  - {fileID: 4333883256580776}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1783,6 +1800,19 @@ Transform:
   - {fileID: 4845631760832004}
   m_Father: {fileID: 4822880107761786}
   m_RootOrder: 4
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &4333883256580776
+Transform:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1927757010197132}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 4315503233874082}
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &4343764488007706
 Transform:
@@ -2742,6 +2772,26 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   pc: {fileID: 114918843430491300}
+--- !u!114 &114104124380633706
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1927757010197132}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05b20572d2e59d24eb9c0f1fcda1b538, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pc: {fileID: 0}
+  abilityCooldown: 2
+  cooldownTime: 0
+  maxTimeFired: 3
+  firingForce: 35
+  hookPrefab: {fileID: 114094264834325688, guid: 9d1b864657d9fbc4f921677fb03146cf,
+    type: 2}
+  travelSpeedPC: 30
+  cancellationForce: 15
 --- !u!114 &114160349504300432
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -2951,16 +3001,21 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 0
+  cc: {fileID: 0}
   baseSpeed: 4
   airBaseSpeed: 3
   isGrounded: 0
   jumpTimeLength: 0.5
   jumpHeight: 5
+  currentMovementAbility: {fileID: 0}
+  movedByAbility: 0
   maxVelocityChange: 5
   stoppingForce: 1
   timeToMaxGravity: 2
   gravity: 15
+  appliedGravity: 0
   cameraContianer: {fileID: 4566543068788828}
+  cam: {fileID: 0}
   head: {fileID: 4774731577663662}
   yRotationSpeed: 45
   xRotationSpeed: 45

@@ -5,11 +5,12 @@ using UnityEngine.Networking;
 
 public class MovementMod
 {
-    public MovementMod(Vector3 direction, float length, bool fade, bool groundClear)
+    public MovementMod(Vector3 direction, float length, bool fade, bool groundClear, bool gravReset)
     {
         modDirection = currentVector = direction;
         modLength = length;
         modFadesOut = fade;
+        resetGravityWhileActive = gravReset;
         removeWhenGrounded = groundClear;
     }
 
@@ -18,6 +19,7 @@ public class MovementMod
     public float modLength;
     public bool modFadesOut;
     public bool removeWhenGrounded;
+    public bool resetGravityWhileActive;
     public float modTimer = 0;
 }
 
@@ -28,7 +30,8 @@ public class ControlPC : NetworkBehaviour
     public AnimationCurve exponentialCurveUp;
 
     // Basic Movement
-    private CharacterController cc;
+    [HideInInspector]
+    public CharacterController cc;
     private Vector3 moveDirection;
     private float speed;
     [Header("Basic Movement")]
@@ -36,7 +39,8 @@ public class ControlPC : NetworkBehaviour
     public float airBaseSpeed;
     public bool isGrounded;
     private bool isFalling;
-    private List<MovementMod> movementModifiers = new List<MovementMod>();
+    [HideInInspector]
+    public List<MovementMod> movementModifiers = new List<MovementMod>();
 
     // Jumping
     [Header("Jumping")]
@@ -45,18 +49,26 @@ public class ControlPC : NetworkBehaviour
     private bool isJumping;
     private float jumpTimer = 0;
 
+    // Movement abilities
+    [HideInInspector]
+    public JB_MovementAbility currentMovementAbility;
+    [HideInInspector]
+    public bool movedByAbility;
+
     // Rigidbody & Physics
     private bool wasStopped;
     public float maxVelocityChange = 10.0f;
     public float stoppingForce = 5;
     public float timeToMaxGravity = 2;
     public float gravity = 1;
-    private float appliedGravity;
+    [HideInInspector]
+    public float appliedGravity;
 
     // Camera
     [Header("Camera")]
     public Transform cameraContianer;
-    private Camera cam;
+    [HideInInspector]
+    public Camera cam;
     public Transform head;
     public float yRotationSpeed = 45;
     public float xRotationSpeed = 45;
@@ -115,6 +127,8 @@ public class ControlPC : NetworkBehaviour
         Application.runInBackground = true;
         anim = GetComponent<Animator>();
         cc = GetComponent<CharacterController>();
+        currentMovementAbility = GetComponentInChildren<JB_MovementAbility>();
+        if (currentMovementAbility) currentMovementAbility.pc = this;
 
         if (isLocalPlayer)
         {
@@ -165,6 +179,7 @@ public class ControlPC : NetworkBehaviour
     {
         // Keyboard input
         moveDirection = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+        moveDirection.Normalize();
         moveDirection = transform.TransformDirection(moveDirection);
         speed = 0;
         if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0)
@@ -185,10 +200,22 @@ public class ControlPC : NetworkBehaviour
         }
         anim.SetFloat("Speed", speed);
 
-        if (isGrounded && !isJumping && Input.GetButtonDown("Jump"))
+        // Movement Ability
+        if (Time.time >= currentMovementAbility.cooldownTime && Input.GetMouseButtonDown(1))
+        {
+            currentMovementAbility.UseAbility(cam.transform.TransformDirection(Vector3.forward));
+        }
+
+        // Aerial
+        if (movedByAbility && Input.GetButtonDown("Jump"))
+        {
+            currentMovementAbility.CancelAbility();
+        }
+        else if (isGrounded && !isJumping && Input.GetButtonDown("Jump"))
         {
             isJumping = true;
         }
+        
 
         // Mouse input
         yRotation += Input.GetAxis("Mouse X") * yRotationSpeed * Time.deltaTime;
@@ -211,32 +238,37 @@ public class ControlPC : NetworkBehaviour
 
     void AlternateMovePC()
     {
-        if (isGrounded)
+        if (!movedByAbility)
         {
-            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
+            if (isGrounded)
             {
-                moveDirection *= baseSpeed * speed;
+                if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
+                {
+                    moveDirection *= baseSpeed * speed;
+                }
+                else
+                {
+                    pcAnimationState = AnimationStates.Idle;
+                }
             }
             else
             {
-                pcAnimationState = AnimationStates.Idle;
+                if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
+                {
+                    moveDirection *= airBaseSpeed * speed;
+                }
             }
-        }
-        else
-        {
-            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
-            {
-                moveDirection *= airBaseSpeed * speed;
-            }
+
+            ApplyJump();
+            ApplyGravity();
+            ApplyMovementModifiers();
+
+            cc.Move(moveDirection * Time.deltaTime);
+            moveDirection = Vector3.zero;
+            if (cc.velocity == Vector3.zero) wasStopped = true;
         }
 
-        ApplyJump();
-        ApplyGravity();
-        ApplyMovementModifiers();
-
-        cc.Move(moveDirection * Time.deltaTime);
-        moveDirection = Vector3.zero;
-        if (cc.velocity == Vector3.zero) wasStopped = true;
+        ResetGravityFromModifier();
     }
 
     void ApplyJump()
@@ -261,7 +293,7 @@ public class ControlPC : NetworkBehaviour
             if (!isFalling)
             {
                 isFalling = true;
-                movementModifiers.Add(new MovementMod(cc.velocity / 2, 1, true, true));
+                movementModifiers.Add(new MovementMod(cc.velocity / 2, 1, true, true, false));
             }
         }
         if (!isJumping)
@@ -296,6 +328,18 @@ public class ControlPC : NetworkBehaviour
         }
     }
 
+    void ResetGravityFromModifier()
+    {
+        for (int i = movementModifiers.Count - 1; i > -1; i--)
+        {
+            if (movementModifiers[i].resetGravityWhileActive)
+            {
+                appliedGravity = 0;
+                return;
+            }
+        }
+    }
+
     void GroundClearMoveMods()
     {
         for (int i = movementModifiers.Count - 1; i > -1; i--)
@@ -308,15 +352,6 @@ public class ControlPC : NetworkBehaviour
     }
 
 #endregion
-
-    //void CheckMoveCollision(Vector3 direction)
-    //{
-    //    RaycastHit hit;
-    //    if (rb.SweepTest(direction, out hit, 1, QueryTriggerInteraction.Ignore))
-    //    {
-    //        print("collision");
-    //    }
-    //}
 
     #region RB Movement
     void MovePC()
@@ -398,7 +433,7 @@ public class ControlPC : NetworkBehaviour
     {
         int layermask = 1 << 8;
         RaycastHit hit;
-        if (Physics.SphereCast(transform.position + Vector3.up, .6f, Vector3.down, out hit, .6f, layermask))
+        if (Physics.SphereCast(transform.position + Vector3.up, (movedByAbility ? .4f : .6f), Vector3.down, out hit, .6f, layermask))
         {
             appliedGravity = gravity / 3;
             isFalling = false;
