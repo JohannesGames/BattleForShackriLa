@@ -179,6 +179,7 @@ public class ControlPC : NetworkBehaviour
     {
         // Keyboard input
         moveDirection = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+        moveDirection.Normalize();
         moveDirection = transform.TransformDirection(moveDirection);
         speed = 0;
         if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0)

@@ -57,6 +57,7 @@ public class JB_GrapplingHookMA : JB_MovementAbility
         firedHook = Instantiate(hookPrefab, pc.cam.transform.position + direction, Quaternion.identity);
         firedHook.sender = this;
         firedHook.rb.velocity = direction * firingForce;
+        firedHook.direction = direction;
         cooldownTime = Time.time + abilityCooldown;
         hasMadeContact = false;
     }
@@ -93,7 +94,7 @@ public class JB_GrapplingHookMA : JB_MovementAbility
     {
         StopCoroutine("MoveToHook");
         if (firedHook) Destroy(firedHook.gameObject);
-        pc.movementModifiers.Add(new MovementMod(hookDirection + Vector3.up * cancellationForce, 2, true, false, false));
+        pc.movementModifiers.Add(new MovementMod(hookDirection * 4 + Vector3.up * cancellationForce, 2, true, false, false));
         pc.appliedGravity = 0;
         pc.movedByAbility = false;
     }

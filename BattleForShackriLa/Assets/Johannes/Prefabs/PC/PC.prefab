@@ -2784,13 +2784,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   pc: {fileID: 0}
-  abilityCooldown: 4
+  abilityCooldown: 2
   cooldownTime: 0
   maxTimeFired: 3
-  firingForce: 75
+  firingForce: 35
   hookPrefab: {fileID: 114094264834325688, guid: 9d1b864657d9fbc4f921677fb03146cf,
     type: 2}
-  travelSpeedPC: 10
+  travelSpeedPC: 30
+  cancellationForce: 15
 --- !u!114 &114160349504300432
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -3012,6 +3013,7 @@ MonoBehaviour:
   stoppingForce: 1
   timeToMaxGravity: 2
   gravity: 15
+  appliedGravity: 0
   cameraContianer: {fileID: 4566543068788828}
   cam: {fileID: 0}
   head: {fileID: 4774731577663662}
