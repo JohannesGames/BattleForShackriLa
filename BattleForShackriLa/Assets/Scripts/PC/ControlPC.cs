@@ -3,26 +3,53 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
+public class MovementMod
+{
+    public MovementMod(Vector3 direction, float length, bool fade, bool groundClear)
+    {
+        modDirection = currentVector = direction;
+        modLength = length;
+        modFadesOut = fade;
+        removeWhenGrounded = groundClear;
+    }
+
+    public Vector3 modDirection;
+    public Vector3 currentVector;
+    public float modLength;
+    public bool modFadesOut;
+    public bool removeWhenGrounded;
+    public float modTimer = 0;
+}
+
 public class ControlPC : NetworkBehaviour
 {
     // Animation
     private Animator anim;
+    public AnimationCurve exponentialCurveUp;
 
     // Basic Movement
-    private Vector2 moveDirection;
+    private CharacterController cc;
+    private Vector3 moveDirection;
     private float speed;
     [Header("Basic Movement")]
     public float baseSpeed;
+    public float airBaseSpeed;
     public bool isGrounded;
+    private bool isFalling;
+    private List<MovementMod> movementModifiers = new List<MovementMod>();
+
+    // Jumping
+    [Header("Jumping")]
+    public float jumpTimeLength = 1;
     public float jumpHeight = 2;
-    public float airMultiplier = .75f;
-    private bool jumpPressed;
+    private bool isJumping;
+    private float jumpTimer = 0;
 
     // Rigidbody & Physics
-    private Rigidbody rb;
     private bool wasStopped;
     public float maxVelocityChange = 10.0f;
     public float stoppingForce = 5;
+    public float timeToMaxGravity = 2;
     public float gravity = 1;
     private float appliedGravity;
 
@@ -87,7 +114,7 @@ public class ControlPC : NetworkBehaviour
     {
         Application.runInBackground = true;
         anim = GetComponent<Animator>();
-        rb = GetComponent<Rigidbody>();
+        cc = GetComponent<CharacterController>();
 
         if (isLocalPlayer)
         {
@@ -98,6 +125,7 @@ public class ControlPC : NetworkBehaviour
             xRotation = cam.transform.localEulerAngles.x;
             wasStopped = true;
             fireTimer = 0;
+            appliedGravity = gravity / 2;
             spawnPoints = FindObjectsOfType<NetworkStartPosition>();
             Cursor.visible = false;
             Cursor.lockState = CursorLockMode.Locked;
@@ -110,7 +138,8 @@ public class ControlPC : NetworkBehaviour
         if (isLocalPlayer)
         {
             GetPlayerInput();
-            CmdCallSync(transform.position, transform.rotation, rb.velocity);
+            AlternateMovePC();
+            CmdCallSync(transform.position, transform.rotation, cc.velocity);
 
             if (Input.GetKeyDown(KeyCode.Escape))   //show cursor in editor
             {
@@ -128,19 +157,19 @@ public class ControlPC : NetworkBehaviour
         {
             return;
         }
-
-        MovePC();
+        CheckForGround();
     }
 
 
     void GetPlayerInput()
     {
         // Keyboard input
-        moveDirection = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+        moveDirection = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
+        moveDirection = transform.TransformDirection(moveDirection);
         speed = 0;
-        if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.y) != 0)
+        if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0)
         {
-            if (Mathf.Abs(moveDirection.x) == 1 || Mathf.Abs(moveDirection.y) == 1)
+            if (Mathf.Abs(moveDirection.x) == 1 || Mathf.Abs(moveDirection.z) == 1)
             {
                 wasStopped = false;
             }
@@ -156,9 +185,9 @@ public class ControlPC : NetworkBehaviour
         }
         anim.SetFloat("Speed", speed);
 
-        if (isGrounded && !jumpPressed && Input.GetButtonDown("Jump"))
+        if (isGrounded && !isJumping && Input.GetButtonDown("Jump"))
         {
-            jumpPressed = true;
+            isJumping = true;
         }
 
         // Mouse input
@@ -175,15 +204,128 @@ public class ControlPC : NetworkBehaviour
         WeaponFire();
     }
 
-    void MovePC()
+    void ResetGravity()
     {
-        CheckForGround();
+        appliedGravity = 0;
+    }
 
+    void AlternateMovePC()
+    {
         if (isGrounded)
         {
-            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.y) != 0) // if there's some input
+            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
             {
-                Vector3 targetVelocity = new Vector3(moveDirection.x, 0, moveDirection.y);
+                moveDirection *= baseSpeed * speed;
+            }
+            else
+            {
+                pcAnimationState = AnimationStates.Idle;
+            }
+        }
+        else
+        {
+            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
+            {
+                moveDirection *= airBaseSpeed * speed;
+            }
+        }
+
+        ApplyJump();
+        ApplyGravity();
+        ApplyMovementModifiers();
+
+        cc.Move(moveDirection * Time.deltaTime);
+        moveDirection = Vector3.zero;
+        if (cc.velocity == Vector3.zero) wasStopped = true;
+    }
+
+    void ApplyJump()
+    {
+        if (isJumping)
+        {
+            jumpTimer += Time.deltaTime;
+            moveDirection += Vector3.up * jumpHeight * (1 - (jumpTimer / jumpTimeLength));
+
+            if (jumpTimer >= jumpTimeLength)
+            {
+                isJumping = false;
+                appliedGravity = jumpTimer = 0;
+            }
+        }
+    }
+
+    void ApplyGravity()
+    {
+        if (!isGrounded)
+        {
+            if (!isFalling)
+            {
+                isFalling = true;
+                movementModifiers.Add(new MovementMod(cc.velocity / 2, 1, true, true));
+            }
+        }
+        if (!isJumping)
+        {
+            moveDirection += Vector3.down * appliedGravity;
+            appliedGravity += gravity * Time.deltaTime;
+        }
+
+    }
+
+    #region Movement Mods
+
+    void ApplyMovementModifiers()   // applies movement modifiers (e.g. motion retained when walking over an edge, or from an explosion)
+    {
+        for (int i = movementModifiers.Count - 1; i > -1; i--)
+        {
+            movementModifiers[i].modTimer += Time.deltaTime;
+
+            if (movementModifiers[i].modTimer >= movementModifiers[i].modLength)    // if the movement modifier has timed out
+            {
+                movementModifiers.RemoveAt(i);
+            }
+            else
+            {
+                if (movementModifiers[i].modFadesOut)   // if the mod force fades out over time reduce it's force
+                {
+                    movementModifiers[i].currentVector = movementModifiers[i].modDirection * (1 - movementModifiers[i].modTimer / movementModifiers[i].modLength);
+                }
+
+                moveDirection += movementModifiers[i].currentVector;
+            }
+        }
+    }
+
+    void GroundClearMoveMods()
+    {
+        for (int i = movementModifiers.Count - 1; i > -1; i--)
+        {
+            if (movementModifiers[i].removeWhenGrounded)
+            {
+                movementModifiers.RemoveAt(i);
+            }
+        }
+    }
+
+#endregion
+
+    //void CheckMoveCollision(Vector3 direction)
+    //{
+    //    RaycastHit hit;
+    //    if (rb.SweepTest(direction, out hit, 1, QueryTriggerInteraction.Ignore))
+    //    {
+    //        print("collision");
+    //    }
+    //}
+
+    #region RB Movement
+    void MovePC()
+    {
+        if (CheckForGround())
+        {
+            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
+            {
+                Vector3 targetVelocity = new Vector3(moveDirection.x, 0, moveDirection.z);
 
                 targetVelocity = transform.TransformDirection(targetVelocity);
 
@@ -196,72 +338,76 @@ public class ControlPC : NetworkBehaviour
                     targetVelocity *= 2;
                 }
 
-                Vector3 velocity = rb.velocity;
+                Vector3 velocity = cc.velocity;
                 Vector3 velocityChange = (targetVelocity - velocity);
                 velocityChange.x = Mathf.Clamp(velocityChange.x, -maxVelocityChange, maxVelocityChange) * .8f;
                 velocityChange.z = Mathf.Clamp(velocityChange.z, -maxVelocityChange, maxVelocityChange);
                 velocityChange.y = 0;
-                rb.AddForce(velocityChange, ForceMode.VelocityChange);
+                //rb.AddForce(velocityChange, ForceMode.VelocityChange);
             }
 
-            if (Mathf.Abs(moveDirection.x) < 1 && Mathf.Abs(moveDirection.y) < 1 && !wasStopped)
-            {
-                rb.AddForce(-rb.velocity * stoppingForce, ForceMode.VelocityChange);
-            }
+            //if (Mathf.Abs(moveDirection.x) < 1 && Mathf.Abs(moveDirection.z) < 1 && !wasStopped)
+            //{
+            //    rb.AddForce(-rb.velocity * stoppingForce, ForceMode.VelocityChange);
+            //}
 
-            if (jumpPressed)
-            {
-                jumpPressed = false;
-                rb.velocity = new Vector3(rb.velocity.x, CalculateJumpVerticalSpeed(), rb.velocity.z);
-            }
+            //if (jumpPressed)
+            //{
+            //    jumpPressed = false;
+            //    rb.velocity = new Vector3(rb.velocity.x, CalculateJumpVerticalSpeed(), rb.velocity.z);
+            //}
         }
         else
         {
-            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.y) != 0) // if there's some input
+            if (Mathf.Abs(moveDirection.x) != 0 || Mathf.Abs(moveDirection.z) != 0) // if there's some input
             {
-                Vector3 targetVelocity = new Vector3(moveDirection.x, 0, moveDirection.y);
+                Vector3 targetVelocity = new Vector3(moveDirection.x, 0, moveDirection.z);
 
                 targetVelocity = transform.TransformDirection(targetVelocity);
 
                 targetVelocity.Normalize();
 
-                targetVelocity *= baseSpeed * airMultiplier;
+                targetVelocity *= airBaseSpeed;
 
-                if (pcAnimationState == AnimationStates.Running)
-                {
-                    targetVelocity *= 2;
-                }
+                //if (pcAnimationState == AnimationStates.Running)
+                //{
+                //    targetVelocity *= 2;
+                //}
 
-                Vector3 velocity = rb.velocity;
-                Vector3 velocityChange = (targetVelocity - velocity);
-                velocityChange.x = Mathf.Clamp(velocityChange.x, -maxVelocityChange, maxVelocityChange) * .8f;
-                velocityChange.z = Mathf.Clamp(velocityChange.z, -maxVelocityChange, maxVelocityChange);
-                velocityChange.y = 0;
-                rb.AddForce(velocityChange * 10, ForceMode.Acceleration);
+                //Vector3 velocity = rb.velocity;
+                //Vector3 velocityChange = (targetVelocity - velocity);
+                //velocityChange.x = Mathf.Clamp(velocityChange.x, -maxVelocityChange, maxVelocityChange) * .8f;
+                //velocityChange.z = Mathf.Clamp(velocityChange.z, -maxVelocityChange, maxVelocityChange);
+                //velocityChange.y = 0;
+                //rb.AddForce(targetVelocity, ForceMode.Acceleration);
             }
         }
 
-        // Gravity
-        appliedGravity = gravity;
-        float grav = -appliedGravity * rb.mass;
-        rb.AddForce(new Vector3(0, grav, 0));
-        //
+        //// Gravity
+        //appliedGravity = gravity;
+        //float grav = -appliedGravity * rb.mass;
+        //rb.AddForce(new Vector3(0, grav, 0));
+        ////
 
-        moveDirection = Vector2.zero;
-        if (rb.velocity == Vector3.zero) wasStopped = true;
+        //moveDirection = Vector3.zero;
+        //if (rb.velocity == Vector3.zero) wasStopped = true;
     }
+#endregion
 
-    void CheckForGround()
+    bool CheckForGround()
     {
         int layermask = 1 << 8;
         RaycastHit hit;
-        if (Physics.SphereCast(transform.position + Vector3.up, .6f, Vector3.down, out hit, .5f, layermask))
+        if (Physics.SphereCast(transform.position + Vector3.up, .6f, Vector3.down, out hit, .6f, layermask))
         {
-            isGrounded = true;
+            appliedGravity = gravity / 3;
+            isFalling = false;
+            GroundClearMoveMods();
+            return isGrounded = true;
         }
         else
         {
-            isGrounded = false;
+            return isGrounded = false;
         }
     }
 
@@ -346,7 +492,7 @@ public class ControlPC : NetworkBehaviour
         {
             print("dead");
             CmdRespawn();
-            CmdCallSync(transform.position, transform.rotation, rb.velocity);
+            CmdCallSync(transform.position, transform.rotation, cc.velocity);
         }
         baseHud.health.text = health.ToString();
     }
@@ -378,7 +524,7 @@ public class ControlPC : NetworkBehaviour
         {
             transform.position = position;
             transform.rotation = rotation;
-            if (rb) rb.velocity = velocity;
+            //if (cc) cc.velocity = velocity;
         }
     }
 }
